@@ -246,7 +246,7 @@ namespace YikYak
         /// <returns>A Yak based on input, or null if the input is bad.</returns>
         public static Yak Create(JsonObject input)
         {
-            if (input.ContainsKey("messageID") && input.ContainsKey("message") && input.ContainsKey("handle"))
+            if (input.ContainsKey("messageID") && input.ContainsKey("message"))
             {
                 Yak y = new Yak();
 

@@ -362,10 +362,13 @@ namespace YikYak
                 for (uint i = 0; i < messageArray.Count; i++)
                 {
                     Yak tmp = Yak.Create(messageArray.GetObjectAt(i));
-                    if (tmp != null) ret.Add(tmp);
+                    if (tmp != null)
+                    {
+                        ret.Add(tmp);
 
-                    if (prev != null) tmp._prev = prev;
-                    prev = tmp;
+                        if (prev != null) tmp._prev = prev;
+                        prev = tmp;
+                    }
                 }
 
                 return ret.ToArray();

@@ -190,7 +190,7 @@ namespace YikYak
             }
 
             Response<String> respAPIUrl = await GetAPIUrl();
-            if (respAPIUrl.Result == Result.SUCCESS)
+            if (respAPIUrl.Result == Result.SUCCESS && !String.IsNullOrWhiteSpace(respAPIUrl.Return))
             {
                 API_URI = new Uri(respAPIUrl.Return);
                 Settings.API_BaseUrl = respAPIUrl.Return;
