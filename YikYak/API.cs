@@ -244,7 +244,10 @@ namespace YikYak
                 }
                 else if (res == Parse.Result.ALREADY_REGISTERED)
                     POST_ACCESS = true;
+
+                Settings.Parse_Success = POST_ACCESS;
             }
+
 
             await LogEvent(LogEventType.ApplicationDidBecomeActive);
 
@@ -519,6 +522,11 @@ namespace YikYak
                 fields.Add("Duration");
                 values.Add(((int)(DateTime.Now - DATETIME_API_STARTED).TotalSeconds).ToString());
             }
+            else
+            {
+                fields.Add("Source");
+                values.Add("Direct");
+            }
 
             fields.AddRange(new String[] { "accuracy", "eventType", "hash", "lat", "long", "salt", "userID", "userLat", "userLong", "version" });
 
@@ -723,38 +731,6 @@ namespace YikYak
                     Yak[] yaks = Helper.GetYaksFromJSON(respObj);
                     if (yaks != null && yaks.Length > 0)
                         return new Response<Yak[]>() { Result = Result.SUCCESS, Return = yaks };
-                }
-
-                return new Response<Yak[]>() { Result = Result.INTERNAL_API_FAILURE, Return = null };
-            }
-            else
-            {
-                return new Response<Yak[]>() { Result = resp.Result, Return = null };
-            }
-        }
-
-        async public Task<Response<Yak[]>> GetAllTimeGreatest()
-        {
-            Uri req = Helper.BuildURI(API_URI, "getGreatest", Location.Accuracy, null, null, Location.Latitude,
-                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, null, null, null, null);
-            Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
-            if (resp.Result == Result.SUCCESS)
-            {
-                JsonObject respObj = null;
-                if (JsonObject.TryParse(resp.Return, out respObj))
-                {
-                    Yak[] yaks = Helper.GetYaksFromJSON(respObj);
-                    if (yaks != null && yaks.Length > 0)
-                    {
-                        // Set Permissions
-                        foreach (Yak y in yaks)
-                        {
-                            y.Vote = VoteStatus.VOTING_DISABLED;
-                            y.IsReadOnly = true;
-                        }
-
-                        return new Response<Yak[]>() { Result = Result.SUCCESS, Return = yaks };
-                    }
                 }
 
                 return new Response<Yak[]>() { Result = Result.INTERNAL_API_FAILURE, Return = null };

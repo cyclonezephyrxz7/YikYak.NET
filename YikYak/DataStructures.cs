@@ -2,10 +2,19 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Windows.Data.Json;
 using Windows.Devices.Geolocation;
+using Windows.Storage;
+using Windows.Storage.Streams;
+using Windows.UI.Xaml;
+using Windows.UI.Xaml.Media.Imaging;
+using Windows.Web.Http;
+using Windows.Web.Http.Filters;
+using Windows.Web.Http.Headers;
 
 namespace YikYak
 {
@@ -176,8 +185,15 @@ namespace YikYak
 
     public class Comment : YakObject
     {
-        public Yak Yak { get; set; }
+        public Yak Yak { get; private set; }
 
+        public String OverlayID { get; private set; }
+        public String BackgroundID { get; private set; }
+
+        public BitmapImage OverlayImage { get; private set; }
+        public BitmapImage BackgroundImage { get; private set; }
+
+        private int _waitCounter;
         /// <summary>
         /// Creates a Comment from a provided JsonObject.  For missing data, fields will assume default values.
         /// If critical fields are missing data, the function will fail.
@@ -203,6 +219,21 @@ namespace YikYak
                 c.Score = (int)Helper.GetJSONValue(input, "numberOfLikes", ExpectedReturnType.INT, int.MinValue);
                 c.Vote = (yak.Vote == VoteStatus.VOTING_DISABLED) ? VoteStatus.VOTING_DISABLED : (VoteStatus)Helper.GetJSONValue(input, "liked", ExpectedReturnType.VOTESTATUS, VoteStatus.NO_VOTE);
 
+                c.OverlayID = (String)Helper.GetJSONValue(input, "overlayID", ExpectedReturnType.STRING, null);
+                c.BackgroundID = (String)Helper.GetJSONValue(input, "backID", ExpectedReturnType.STRING, null);
+
+                int overlayInt;
+                if (!String.IsNullOrWhiteSpace(c.OverlayID) && int.TryParse(c.OverlayID, out overlayInt) && overlayInt >= 0 && overlayInt <= 20)
+                    c.OverlayImage = new BitmapImage(new Uri("ms-appx:///YikYak/Foregrounds/" + c.OverlayID + ".png"));
+                else
+                    c.OverlayImage = null;
+
+                int backgroundInt;
+                if (!String.IsNullOrWhiteSpace(c.BackgroundID) && int.TryParse(c.BackgroundID, out backgroundInt) && backgroundInt >= 0 && backgroundInt <= 10)
+                    c.BackgroundImage = new BitmapImage(new Uri("ms-appx:///YikYak/Backgrounds/" + c.BackgroundID + ".png"));
+                else
+                    c.BackgroundImage = null;
+
                 c.DeliveryID = (int)Helper.GetJSONValue(input, "deliveryID", ExpectedReturnType.INT, 0);
 
                 return c;
@@ -211,6 +242,72 @@ namespace YikYak
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// In the event that I haven't got a local cached image for either of the Background or Overlay,
+        /// this method will retrieve them asynchronously from the Cloudfront hosting service.
+        /// </summary>
+        async public Task<bool> GetBackgroundAndOverlay()
+        {
+            if (_waitCounter != 0)
+                return false;
+
+            int tmp;
+            if (!String.IsNullOrWhiteSpace(OverlayID) && !String.IsNullOrWhiteSpace(BackgroundID) &&
+                int.TryParse(OverlayID, out tmp) && int.TryParse(BackgroundID, out tmp))
+            {
+                try
+                {
+                    OverlayImage = new BitmapImage(new Uri(Config.CLOUDFRONT_URI, "/replier/overlays/android/drawable-xxhdpi/" + OverlayID));
+                    Interlocked.Increment(ref _waitCounter);
+
+                    BackgroundImage = new BitmapImage(new Uri(Config.CLOUDFRONT_URI, "/replier/backgrounds/android/drawable-xxhdpi/" + BackgroundID));
+                    Interlocked.Increment(ref _waitCounter);
+
+                    OverlayImage.ImageOpened += OverlayImage_ImageOpened;
+                    OverlayImage.ImageFailed += OverlayImage_ImageFailed;
+
+                    BackgroundImage.ImageOpened += BackgroundImage_ImageOpened;
+                    BackgroundImage.ImageFailed += BackgroundImage_ImageFailed;
+
+                    await Task.Run(() =>
+                    {
+                        while (_waitCounter > 0) { };
+                    });
+
+                    return (BackgroundImage != null && OverlayImage != null);
+                }
+                catch
+                {
+                    OverlayImage = null;
+                    BackgroundImage = null;
+                }
+            }
+
+            return false;
+        }
+
+        private void BackgroundImage_ImageFailed(object sender, Windows.UI.Xaml.ExceptionRoutedEventArgs e)
+        {
+            BackgroundImage = null;
+            Interlocked.Decrement(ref _waitCounter);
+        }
+
+        private void BackgroundImage_ImageOpened(object sender, Windows.UI.Xaml.RoutedEventArgs e)
+        {
+            Interlocked.Decrement(ref _waitCounter);
+        }
+
+        private void OverlayImage_ImageFailed(object sender, Windows.UI.Xaml.ExceptionRoutedEventArgs e)
+        {
+            OverlayImage = null;
+            Interlocked.Decrement(ref _waitCounter);
+        }
+
+        private void OverlayImage_ImageOpened(object sender, Windows.UI.Xaml.RoutedEventArgs e)
+        {
+            Interlocked.Decrement(ref _waitCounter);
         }
     }
 

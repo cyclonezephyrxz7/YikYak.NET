@@ -30,7 +30,7 @@ namespace YikYak
         public const String PARSE_CONSUMER_ID = "";
 
 
-        public const String API_VERSION = "2.4.2";
+        public const String API_VERSION = "2.5.1";
 
         /// <summary>
         /// The User-Agent to provide when making requests.  For best results, select a correctly formatted, fairly common Android Dalvik user agent.

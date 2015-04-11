@@ -128,7 +128,7 @@ namespace YikYak
         {
             JsonObject jsonContent = new JsonObject();
             jsonContent.Add("v", JsonValue.CreateStringValue("a1.7.1"));
-            jsonContent.Add("appBuildVersion", JsonValue.CreateStringValue("55"));
+            jsonContent.Add("appBuildVersion", JsonValue.CreateStringValue("56"));
             jsonContent.Add("osVersion", JsonValue.CreateStringValue("4.4.4"));
             jsonContent.Add("iid", JsonValue.CreateStringValue(_iid.ToString()));
             jsonContent.Add("classname", JsonValue.CreateStringValue("_Installation"));
@@ -188,7 +188,7 @@ namespace YikYak
 
                     HTTP_CLIENT.DefaultRequestHeaders.CacheControl.Clear();
                     HTTP_CLIENT.DefaultRequestHeaders.UserAgent.Clear();
-                    HTTP_CLIENT.DefaultRequestHeaders.UserAgent.ParseAdd("Parse Android SDK 1.7.1 (com.yik.yak/55) API Level 19");
+                    HTTP_CLIENT.DefaultRequestHeaders.UserAgent.ParseAdd("Parse Android SDK 1.7.1 (com.yik.yak/56) API Level 19");
                     HTTP_CLIENT.DefaultRequestHeaders.AcceptEncoding.Clear();
                     HTTP_CLIENT.DefaultRequestHeaders.AcceptEncoding.Add(new HttpContentCodingWithQualityHeaderValue("gzip"));
                 }

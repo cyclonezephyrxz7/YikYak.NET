@@ -100,6 +100,41 @@
     <TargetPlatform Include="Windows, Version=8.1" />
     <TargetPlatform Include="WindowsPhoneApp, Version=8.1" />
   </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <Content Include="Backgrounds\000.png" />
+    <Content Include="Backgrounds\001.png" />
+    <Content Include="Backgrounds\002.png" />
+    <Content Include="Backgrounds\003.png" />
+    <Content Include="Backgrounds\004.png" />
+    <Content Include="Backgrounds\005.png" />
+    <Content Include="Backgrounds\006.png" />
+    <Content Include="Backgrounds\007.png" />
+    <Content Include="Backgrounds\008.png" />
+    <Content Include="Backgrounds\009.png" />
+    <Content Include="Backgrounds\010.png" />
+    <Content Include="Foregrounds\000.png" />
+    <Content Include="Foregrounds\001.png" />
+    <Content Include="Foregrounds\002.png" />
+    <Content Include="Foregrounds\003.png" />
+    <Content Include="Foregrounds\004.png" />
+    <Content Include="Foregrounds\005.png" />
+    <Content Include="Foregrounds\006.png" />
+    <Content Include="Foregrounds\007.png" />
+    <Content Include="Foregrounds\008.png" />
+    <Content Include="Foregrounds\009.png" />
+    <Content Include="Foregrounds\010.png" />
+    <Content Include="Foregrounds\011.png" />
+    <Content Include="Foregrounds\012.png" />
+    <Content Include="Foregrounds\013.png" />
+    <Content Include="Foregrounds\014.png" />
+    <Content Include="Foregrounds\015.png" />
+    <Content Include="Foregrounds\016.png" />
+    <Content Include="Foregrounds\017.png" />
+    <Content Include="Foregrounds\018.png" />
+    <Content Include="Foregrounds\019.png" />
+    <Content Include="Foregrounds\020.png" />
+  </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '12.0' ">
     <VisualStudioVersion>12.0</VisualStudioVersion>
   </PropertyGroup>
