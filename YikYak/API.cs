@@ -1138,6 +1138,12 @@ namespace YikYak
             Location = await Helper.GetLocation(500, TimeSpan.Zero);
         }
 
+        public static void ForceNewLocationOnInit()
+        {
+            Settings.SavedLocation_Accuracy = Settings.SavedLocation_Latitude = Settings.SavedLocation_Longitude = null;
+            Settings.SavedLocation_Timestamp = DateTime.MinValue;
+        }
+
         #endregion
     }
 }
