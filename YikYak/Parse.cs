@@ -248,10 +248,10 @@ namespace YikYak
 
             Uri dest = new Uri(Config.PARSE_URI + "create");
 
-            HttpResponseMessage resp = await HTTP_CLIENT.PostAsync(dest, requestContent);
-
             try
             {
+                HttpResponseMessage resp = await HTTP_CLIENT.PostAsync(dest, requestContent);
+
                 String strResponse = await resp.Content.ReadAsStringAsync();
                 JsonValue jsonResponse = JsonValue.Parse(strResponse);
                 JsonObject objResponse = jsonResponse.GetObject();

@@ -31,6 +31,8 @@ namespace YikYak
             internal const String Parse_OID = "ParseObjectID";
 
             internal const String CustomPeekLocations = "YikYakCustomLocations";
+
+            internal const String SuppressYakAds = "YikYakSuppressYakAds";
         }
 
         public static double? SavedLocation_Latitude
@@ -83,7 +85,7 @@ namespace YikYak
         public static UserIDGenerationMethod UserID_GenerationMethod
         {
             get { return (UserIDGenerationMethod)TryGetLocalSetting(Keys.UserID_GenerationMethod, UserIDGenerationMethod.Standard); }
-            set { PutLocalSetting(Keys.UserID_GenerationMethod, value); }
+            set { PutLocalSetting(Keys.UserID_GenerationMethod, (int)value); }
         }
 
         public static String API_BaseUrl
@@ -128,6 +130,12 @@ namespace YikYak
             internal set { PutLocalSetting(Keys.CustomPeekLocations, BaseLocation.Serialize(value)); }
         }
 
+        public static bool SuppressYakAds
+        {
+            get { return (bool)TryGetLocalSetting(Keys.SuppressYakAds, false); }
+            internal set { PutLocalSetting(Keys.SuppressYakAds, value); }
+        }
+
         private static Object TryGetLocalSetting(String key, Object def = null)
         {
             if (ApplicationData.Current.LocalSettings.Values.ContainsKey(key))
@@ -143,5 +151,7 @@ namespace YikYak
             else
                 ApplicationData.Current.LocalSettings.Values.Add(key, val);
         }
+
+        
     }
 }

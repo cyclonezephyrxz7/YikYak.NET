@@ -156,10 +156,10 @@ namespace YikYak
 
             if (accuracy != null) query.Append("accuracy=").Append(accuracy.Value.ToString("F1")).Append("&");
             if (deviceID != null) query.Append("deviceID=").Append(deviceID).Append("&");
+            if (commentID != null) query.Append("commentID=").Append(WebUtility.UrlEncode(commentID)).Append("&");
             if (latitude != null) query.Append("lat=").Append(latitude.Value.ToString("F7")).Append("&");
             if (longitude != null) query.Append("long=").Append(longitude.Value.ToString("F7")).Append("&");
             if (token != null) query.Append("token=").Append(token).Append("&");
-            if (commentID != null) query.Append("commentID=").Append(WebUtility.UrlEncode(commentID)).Append("&");
             if (messageID != null) query.Append("messageID=").Append(WebUtility.UrlEncode(messageID)).Append("&");
             if (reason != null) query.Append("reason=").Append(WebUtility.UrlEncode(reason)).Append("&");
             if (peekID != null) query.Append("peekID=").Append(peekID.Value).Append("&");
@@ -364,10 +364,13 @@ namespace YikYak
                     Yak tmp = Yak.Create(messageArray.GetObjectAt(i));
                     if (tmp != null)
                     {
-                        ret.Add(tmp);
-
-                        if (prev != null) tmp._prev = prev;
-                        prev = tmp;
+                        if (tmp.DeliveryID >= 10000)
+                        {
+                            if (!Settings.SuppressYakAds)
+                                ret.Insert(0, tmp);
+                        }
+                        else
+                            ret.Add(tmp);
                     }
                 }
 

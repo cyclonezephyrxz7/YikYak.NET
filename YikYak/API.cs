@@ -990,10 +990,35 @@ namespace YikYak
 
         }
 
+        async public Task<Response<bool>> ReportComment(Comment c, String reason)
+        {
+            Uri req = Helper.BuildURI(API_URI, "reportComment", Location.Accuracy, null, null, Location.Latitude, 
+                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, c.Yak.ID, c.ID, null, reason);
+            Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
+
+            if (resp.Result == Result.SUCCESS)
+                return new Response<bool>() { Result = Result.SUCCESS, Return = true };
+            else
+                return new Response<bool>() { Result = resp.Result, Return = false };
+        }
+
         async public Task<Response<bool>> DeleteYak(Yak yak)
         {
             Uri req = Helper.BuildURI(API_URI, "deleteMessage2", Location.Accuracy, null, null, Location.Latitude,
                                       Location.Longitude, UserID, Location.Latitude, Location.Longitude, yak.ID, null, null, null);
+            Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
+
+            if (resp.Result == Result.SUCCESS)
+                return new Response<bool>() { Result = Result.SUCCESS, Return = true };
+            else
+                return new Response<bool>() { Result = resp.Result, Return = false };
+
+        }
+
+        async public Task<Response<bool>> DeleteComment(Comment c)
+        {
+            Uri req = Helper.BuildURI(API_URI, "deleteComment", Location.Accuracy, null, null, Location.Latitude,
+                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, c.Yak.ID, c.ID, null, null);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
 
             if (resp.Result == Result.SUCCESS)
@@ -1142,6 +1167,11 @@ namespace YikYak
         {
             Settings.SavedLocation_Accuracy = Settings.SavedLocation_Latitude = Settings.SavedLocation_Longitude = null;
             Settings.SavedLocation_Timestamp = DateTime.MinValue;
+        }
+
+        public void SuppressYakAds(bool v)
+        {
+            Settings.SuppressYakAds = v;
         }
 
         #endregion

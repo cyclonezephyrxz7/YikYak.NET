@@ -88,13 +88,6 @@ namespace YikYak
             } 
         }
 
-        // A hackish way to get my layout working
-        internal YakObject _prev;
-        public bool IsPrevMine
-        {
-            get { return (_prev == null) ? false : _prev.IsMine; }
-        }
-
         private int _score;
         public int Score
         {
