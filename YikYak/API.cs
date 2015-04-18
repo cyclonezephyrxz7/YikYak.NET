@@ -170,7 +170,7 @@ namespace YikYak
                     Debug.WriteLine("YikYak.API: Saved Location Aged");
 
                     // Refresh Location
-                    Location = await Helper.GetLocation(500, new TimeSpan(0,0,5));
+                    Location = await Helper.GetLocation(500, TimeSpan.Zero);
 
                     if (Location == null)
                         Location = new Location(savedLatitude.Value, savedLongitude.Value, savedAccuracy.Value, savedTimestamp);
@@ -187,6 +187,10 @@ namespace YikYak
                 {
                     Location = new Location(savedLatitude.Value, savedLongitude.Value, savedAccuracy.Value, savedTimestamp);
                 }
+            }
+            else
+            {
+                Location = new Location(savedLatitude.Value, savedLongitude.Value, savedAccuracy.Value, savedTimestamp);
             }
 
             Response<String> respAPIUrl = await GetAPIUrl();
@@ -1161,6 +1165,12 @@ namespace YikYak
             Settings.TravelMode_Enabled = false;
 
             Location = await Helper.GetLocation(500, TimeSpan.Zero);
+
+            // Store it
+            Settings.SavedLocation_Latitude = Location.Latitude;
+            Settings.SavedLocation_Longitude = Location.Longitude;
+            Settings.SavedLocation_Accuracy = Location.Accuracy;
+            Settings.SavedLocation_Timestamp = Location.Timestamp;
         }
 
         public static void ForceNewLocationOnInit()
