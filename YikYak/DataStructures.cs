@@ -208,7 +208,13 @@ namespace YikYak
                 }
 
                 c.PosterID = (String)Helper.GetJSONValue(input, "posterID", ExpectedReturnType.STRING, "");
-                c.Timestamp = (DateTime)Helper.GetJSONValue(input, "time", ExpectedReturnType.DATETIME, new DateTime());
+                //c.Timestamp = (DateTime)Helper.GetJSONValue(input, "time", ExpectedReturnType.DATETIME, new DateTime());
+                long epoch = (long)((double)Helper.GetJSONValue(input, "gmt", ExpectedReturnType.DOUBLE, -1.0));
+                if (epoch == -1.0)
+                    c.Timestamp = DateTime.Now;
+                else
+                    c.Timestamp = (new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).AddSeconds(epoch).ToLocalTime();
+
                 c.Score = (int)Helper.GetJSONValue(input, "numberOfLikes", ExpectedReturnType.INT, int.MinValue);
                 c.Vote = (yak.Vote == VoteStatus.VOTING_DISABLED) ? VoteStatus.VOTING_DISABLED : (VoteStatus)Helper.GetJSONValue(input, "liked", ExpectedReturnType.VOTESTATUS, VoteStatus.NO_VOTE);
 
@@ -349,7 +355,12 @@ namespace YikYak
 
                 y.PosterHandle = (String)Helper.GetJSONValue(input, "handle", ExpectedReturnType.STRING, "");
                 y.PosterID = (String)Helper.GetJSONValue(input, "posterID", ExpectedReturnType.STRING, "");
-                y.Timestamp = (DateTime)Helper.GetJSONValue(input, "time", ExpectedReturnType.DATETIME, new DateTime());
+                //y.Timestamp = (DateTime)Helper.GetJSONValue(input, "time", ExpectedReturnType.DATETIME, new DateTime());
+                long epoch = (long)((double)Helper.GetJSONValue(input, "gmt", ExpectedReturnType.DOUBLE, -1.0));
+                if (epoch == -1.0)
+                    y.Timestamp = DateTime.Now;
+                else
+                    y.Timestamp = (new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).AddSeconds(epoch).ToLocalTime();
 
                 y.CommentsCount = (int)Helper.GetJSONValue(input, "comments", ExpectedReturnType.INT, 0);
                 y.Score = (int)Helper.GetJSONValue(input, "numberOfLikes", ExpectedReturnType.INT, 0);
