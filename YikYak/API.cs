@@ -31,8 +31,7 @@ namespace YikYak
 
         private bool POST_ACCESS = false;
         private bool CAN_CHANGE_VOTE = true;
-        private String[] DANGER_WORDS;
-        private String DANGER_WORDS_MESSAGE;
+        private List<ThreatCheck> THREAT_CHECKS;
         private TimeSpan THRESHOLD_LOCATION_TIMESPAN = new TimeSpan(0, 10, 0);
 
         #endregion
@@ -64,8 +63,6 @@ namespace YikYak
         }
 
         public int Yakarma { get; private set; }
-
-        public String DangerWordsMessage { get { return DANGER_WORDS_MESSAGE; } }
 
         #endregion
 
@@ -108,8 +105,33 @@ namespace YikYak
             DateTime savedTimestamp = Settings.SavedLocation_Timestamp;
 
             API_URI = new Uri(Settings.API_BaseUrl);
-            DANGER_WORDS_MESSAGE = Settings.DangerWords_Message;
-            DANGER_WORDS = Settings.DangerWords_Array;
+            THREAT_CHECKS = ThreatCheck.DeserializeFromSettings();
+            if (THREAT_CHECKS == null)
+            {
+                // Populate defaults
+                ThreatCheck check0 = new ThreatCheck();
+                check0.Message = "Pump the brakes, this yak may contain threatening language. Now it's probably nothing and you're probably an awesome person but just know that Yik Yak and law enforcement take threats seriously. So you tell us, is this yak cool to post?";
+                check0.AllowContinue = true;
+                check0.Expressions = new String[] { "\\U0001F52A", "\\U0001F4A3", "\\U0001F52B", "Bullet\\b", "Bullets\\b", "Kill\\b", "Killing\\b", "\\bkill\\b", "\\bkills\\b", "blow up\\b", "bomb\\b", "bombed\\b", "bomber\\b", "bombing\\b", "bombing\\b", "bombs\\b", "bombs\\b", "columbine\\b", "explosion\\b", "explosive\\b", "explosives\\b", "gun\\b", "gunman\\b", "guns\\b", "handgun\\b", "handguns\\b", "killer\\b", "killing\\b", "knife\\b", "macheted\\b", "rape\\b", "raped\\b", "sandy hook\\b", "shoot\\b", "shooter\\b", "shooting\\b", "shooting\\b" };
+
+                ThreatCheck check1 = new ThreatCheck();
+                check1.Message = "Whoa man, that's insensitive! Tone it down!";
+                check1.AllowContinue = true;
+                check1.Expressions = new String[] { "black\\speople", "white\\speople", "asian\\speople" };
+
+                ThreatCheck check2 = new ThreatCheck();
+                check2.Message = "It looks like you might be trying to post a phone number. Please respect people's privacy and don't do that.";
+                check2.AllowContinue = false;
+                check2.Expressions = new String[] { "[0-9]{7,10}|[0-9]{3}[\\.\\-\\s][0-9]{3}[\\.\\-\\s][0-9]{4}|[0-9]{3}[\\.\\-\\s][0-9]{4}" };
+
+                THREAT_CHECKS = new List<ThreatCheck>();
+                THREAT_CHECKS.Add(check0);
+                THREAT_CHECKS.Add(check1);
+                THREAT_CHECKS.Add(check2);
+
+                ThreatCheck.SerializeToSettings(THREAT_CHECKS);
+            }
+
             UserID = Settings.UserID;
 
             bool ForceNewUserID = Settings.UserID_ForceNew;
@@ -193,15 +215,7 @@ namespace YikYak
                 Location = new Location(savedLatitude.Value, savedLongitude.Value, savedAccuracy.Value, savedTimestamp);
             }
 
-            Response<String> respAPIUrl = await GetAPIUrl();
-            if (respAPIUrl.Result == Result.SUCCESS && !String.IsNullOrWhiteSpace(respAPIUrl.Return))
-            {
-                API_URI = new Uri(respAPIUrl.Return);
-                Settings.API_BaseUrl = respAPIUrl.Return;
-                Debug.WriteLine("YikYak.API.Init: API_BaseUrl is {0}", respAPIUrl.Return);
-            }
-
-            await UpdateConfig();
+            await GetAndUpdateConfig();
 
             if (String.IsNullOrWhiteSpace(UserID) || ForceNewUserID)
             {
@@ -378,7 +392,7 @@ namespace YikYak
             String token = CryptographicBuffer.EncodeToHexString(hashedDeviceID).ToUpper();
 
             Uri req = Helper.BuildURI(API_URI, "registerUser", Location.Accuracy, deviceID, token, Location.Latitude,
-                                      Location.Longitude, ID, Location.Latitude, Location.Longitude, null, null, null, null);
+                                      Location.Longitude, ID, Location.Latitude, Location.Longitude, null, null, null, null, null);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
 
             if (resp.Result == Result.SUCCESS && resp.Return.Equals("1"))
@@ -388,25 +402,27 @@ namespace YikYak
         }
 
         /// <summary>
-        /// Performs a GET request to determine which API Url we should be using.
+        /// Performs a GET request to determine a series of API configuration values
         /// </summary>
         /// <returns></returns>
-        async private Task<Response<String>> GetAPIUrl()
+        async private Task GetAndUpdateConfig()
         {
             CancellationTokenSource cts = new CancellationTokenSource();
-            cts.CancelAfter(1000);
-            Response<String> resp = await Helper.Get(HTTP_CLIENT, new Uri(Config.CLOUDFRONT_URI, "yikyakurl.json"), cts.Token);
+            cts.CancelAfter(1500);
+            Response<String> resp = await Helper.Get(HTTP_CLIENT, new Uri(Config.CLOUDFRONT_URI, "yikyak-config-android.json"), cts.Token);
 
             if (resp.Result == Result.SUCCESS)
             {
-                JsonObject respObj = null;
-                if (JsonObject.TryParse(resp.Return, out respObj))
+                JsonObject respObject = null;
+                if (JsonObject.TryParse(resp.Return, out respObject))
                 {
+                    JsonObject config = respObject.GetNamedObject("configuration", null);
+
                     try
                     {
-                        JsonObject config = respObj.GetNamedObject("configuration", null);
                         if (config != null)
                         {
+                            // Try to determine API ENDPOINT using Location
                             String selectedEndpoint = (String)Helper.GetJSONValue(config, "default_endpoint", ExpectedReturnType.STRING, "");
                             JsonArray endpoints = config.GetNamedArray("endpoints", null);
                             if (endpoints != null)
@@ -425,7 +441,7 @@ namespace YikYak
                                     if ((Location.Latitude >= minLat && Location.Latitude <= maxLat) && (Location.Longitude >= minLong && Location.Longitude <= maxLong))
                                     {
                                         selectedEndpoint = (String)Helper.GetJSONValue(endpoint, "url", ExpectedReturnType.STRING, "");
-                                        Debug.WriteLine("YikYak.API.GetAPIUrl: URL({0})", selectedEndpoint);
+                                        Debug.WriteLine("YikYak.API: GetAndUpdateConfig Endpoint({0})", selectedEndpoint);
                                         break;
                                     }
                                 }
@@ -433,81 +449,48 @@ namespace YikYak
 
                             if (!String.IsNullOrWhiteSpace(selectedEndpoint))
                             {
+                                // Set the updated endpoint
                                 if (!selectedEndpoint.EndsWith("/")) selectedEndpoint += "/";
-                                return new Response<string>() { Result = Result.SUCCESS, Return = selectedEndpoint };
+
+                                API_URI = new Uri(selectedEndpoint);
+                                Settings.API_BaseUrl = selectedEndpoint;
+                                Debug.WriteLine("YikYak.API: GetAndUpdateConfig API_URI({0})", selectedEndpoint);
+                            }
+                        }
+                    }
+                    catch 
+                    {
+                        Debug.WriteLine("YikYak.API: GetAndUpdateConfig - Failed to update Endpoint");
+                    }
+
+                    try
+                    {
+                        // Next, set the different threat_checks lists
+                        JsonArray threatChecksArr = config.GetNamedArray("threat_checks", null);
+                        if (threatChecksArr != null)
+                        {
+                            List<ThreatCheck> loadedChecks = new List<ThreatCheck>();
+                            for (uint i = 0; i < threatChecksArr.Count; i++)
+                            {
+                                ThreatCheck tc = new ThreatCheck(threatChecksArr.GetObjectAt(i));
+                                if (tc.Message != null && tc.Expressions != null)
+                                    loadedChecks.Add(tc);
+                            }
+
+                            if (loadedChecks.Count != 0)
+                            {
+                                THREAT_CHECKS = loadedChecks;
+                                ThreatCheck.SerializeToSettings(THREAT_CHECKS);
+                                Debug.WriteLine("YikYak.API: GetAndUpdateConfig - Updated ThreatChecks");
                             }
                         }
                     }
                     catch
                     {
-
+                        Debug.WriteLine("YikYak.API: GetAndUpdateConfig - Failed to update ThreatChecks");
                     }
                 }
-                
-                return new Response<String>() { Result = Result.INTERNAL_API_FAILURE, Return = null };
             }
-            else
-                return new Response<String>() { Result = resp.Result, Return = null };
-        }
-        
-        /// <summary>
-        /// Performs a GET request to update certain configuration variables (Danger Words [Message] and Vote Changing for now)
-        /// </summary>
-        /// <returns></returns>
-        async private Task<Response<bool>> UpdateConfig()
-        {
-            CancellationTokenSource cts1 = new CancellationTokenSource();
-            cts1.CancelAfter(1000);
-            Response<String> resp1 = await Helper.Get(HTTP_CLIENT, new Uri(Config.CLOUDFRONT_URI, "yikyak-config.json"), cts1.Token);
-
-            if (resp1.Result == Result.SUCCESS)
-            {
-                try
-                {
-                    JsonObject configRoot = JsonObject.Parse(resp1.Return);
-                    JsonObject configConfig = configRoot.GetNamedObject("configuration");
-
-                    JsonObject votingConfig = configConfig.GetNamedObject("voting");
-                    JsonObject threatConfig = configConfig.GetNamedObject("threatWords");
-
-                    // Now Get Threat Words
-                    CancellationTokenSource cts2 = new CancellationTokenSource();
-                    cts2.CancelAfter(1000);
-                    Response<String> resp2 = await Helper.Get(HTTP_CLIENT, new Uri(threatConfig.GetNamedString("threatWordsUrl")), cts2.Token);
-                    if (resp2.Result == Result.SUCCESS)
-                    {
-                        JsonObject wordsRoot = JsonObject.Parse(resp2.Return);
-                        JsonObject wordsConfig = wordsRoot.GetNamedObject("configuration");
-
-                        JsonArray expressions = wordsConfig.GetNamedArray("threat_checks").GetObjectAt(0).GetNamedArray("expressions");
-
-                        // Now, populate all relevant variables
-                        CAN_CHANGE_VOTE = (bool)Helper.GetJSONValue(votingConfig, "enableVoteChanging", ExpectedReturnType.BOOLEAN, true);
-                        Debug.WriteLine("YikYak.API.UpdateConfig: CAN_CHANGE_VOTE is {0}", CAN_CHANGE_VOTE);
-
-                        DANGER_WORDS_MESSAGE = (String)Helper.GetJSONValue(threatConfig, "message", ExpectedReturnType.STRING, DANGER_WORDS_MESSAGE);
-                        Settings.DangerWords_Message = DANGER_WORDS_MESSAGE;
-                        Debug.WriteLine("YikYak.API.UpdateConfig: DangerWordsMessage is \"{0}\"", DANGER_WORDS_MESSAGE);
-
-                        DANGER_WORDS = new String[expressions.Count];
-                        for (uint i = 0; i < expressions.Count; i++)
-                            DANGER_WORDS[i] = expressions.GetStringAt(i);
-
-                        Settings.DangerWords_Array = DANGER_WORDS;
-                        Debug.WriteLine("YikYak.API.UpdateConfig: DANGER_WORDS is [{0}]", String.Join(",", DANGER_WORDS));
-
-                        return new Response<bool>() { Result = Result.SUCCESS, Return = true };
-                    }
-                    else
-                        return new Response<bool>() { Result = resp2.Result, Return = false };
-                }
-                catch
-                {
-                    return new Response<bool>() { Result = Result.INTERNAL_API_FAILURE, Return = false };
-                } 
-            }
-            else
-                return new Response<bool>() { Result = resp1.Result, Return = false };
         }
 
         #endregion
@@ -516,7 +499,7 @@ namespace YikYak
 
         async public Task<Response<bool>> LogEvent(LogEventType type)
         {
-            Uri dest = Helper.BuildURI(API_URI, "logEvent", Location.Accuracy, null, null, null, null, UserID, Location.Latitude, Location.Longitude, null, null, null, null);
+            Uri dest = Helper.BuildURI(API_URI, "logEvent", Location.Accuracy, null, null, null, null, UserID, Location.Latitude, Location.Longitude, null, null, null, null, null);
 
             List<String> fields = new List<String>();
             List<String> values = new List<String>();
@@ -655,7 +638,7 @@ namespace YikYak
         async public Task<Response<Yak>> GetYak(String yakID)
         {
             Uri req = Helper.BuildURI(API_URI, "getMessage", Location.Accuracy, null, null, null,
-                                      null, UserID, Location.Latitude, Location.Longitude, yakID, null, null, null);
+                                      null, UserID, Location.Latitude, Location.Longitude, yakID, null, null, null, null);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
             if (resp.Result == Result.SUCCESS)
             {
@@ -678,7 +661,7 @@ namespace YikYak
         async public Task<Response<Yak[]>> GetLocalRecent()
         {
             Uri req = Helper.BuildURI(API_URI, "getMessages", Location.Accuracy, null, null, Location.Latitude,
-                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, null, null, null, null);
+                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, null, null, null, null, false);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
             if (resp.Result == Result.SUCCESS)
             {
@@ -725,7 +708,7 @@ namespace YikYak
         async public Task<Response<Yak[]>> GetLocalHot()
         {
             Uri req = Helper.BuildURI(API_URI, "hot", Location.Accuracy, null, null, Location.Latitude,
-                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, null, null, null, null);
+                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, null, null, null, null, false);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
             if (resp.Result == Result.SUCCESS)
             {
@@ -748,7 +731,7 @@ namespace YikYak
         async public Task<Response<Yak[]>> GetPeekYaks(PeekLocation peek)
         {
             Uri req = Helper.BuildURI(API_URI, "getPeekMessages", Location.Accuracy, null, null, Location.Latitude,
-                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, null, null, peek.ID, null);
+                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, null, null, peek.ID, null, null);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
             if (resp.Result == Result.SUCCESS)
             {
@@ -783,7 +766,7 @@ namespace YikYak
             String dest = (hot) ? "hot" : "yaks";
 
             Uri req = Helper.BuildURI(API_URI, dest, Location.Accuracy, null, null, peek.Latitude,
-                                      peek.Longitude, UserID, Location.Latitude, Location.Longitude, null, null, null, null);
+                                      peek.Longitude, UserID, Location.Latitude, Location.Longitude, null, null, null, null, null);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
             if (resp.Result == Result.SUCCESS)
             {
@@ -819,7 +802,7 @@ namespace YikYak
             if (longitude == null) longitude = Location.Longitude;
 
             Uri req = Helper.BuildURI(API_URI, "getMessages", Location.Accuracy, null, null, latitude,
-                                      longitude, UserID, Location.Latitude, Location.Longitude, null, null, null, null);
+                                      longitude, UserID, Location.Latitude, Location.Longitude, null, null, null, null, null);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
             if (resp.Result == Result.SUCCESS)
             {
@@ -852,7 +835,7 @@ namespace YikYak
         async public Task<Response<Yak[]>> GetMyYaks()
         {
             Uri req = Helper.BuildURI(API_URI, "getMyRecentYaks", Location.Accuracy, null, null, Location.Latitude,
-                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, null, null, null, null);
+                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, null, null, null, null, null);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
             if (resp.Result == Result.SUCCESS)
             {
@@ -877,7 +860,7 @@ namespace YikYak
         async public Task<Response<Yak[]>> GetMyReplies()
         {
             Uri req = Helper.BuildURI(API_URI, "getMyRecentReplies", Location.Accuracy, null, null, Location.Latitude,
-                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, null, null, null, null);
+                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, null, null, null, null, null);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
             if (resp.Result == Result.SUCCESS)
             {
@@ -902,7 +885,7 @@ namespace YikYak
         async public Task<Response<Comment[]>> GetComments(Yak yak)
         {
             Uri req = Helper.BuildURI(API_URI, "getComments", Location.Accuracy, null, null, Location.Latitude,
-                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, yak.ID, null, null, null);
+                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, yak.ID, null, null, null, false);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
             if (resp.Result == Result.SUCCESS)
             {
@@ -941,7 +924,7 @@ namespace YikYak
                 yak.DoVote(isUpvote);
 
                 String dest = isUpvote ? "likeMessage" : "downvoteMessage";
-                Uri req = Helper.BuildURI(API_URI, dest, Location.Accuracy, null, null, null, null, UserID, Location.Latitude, Location.Longitude, yak.ID, null, null, null);
+                Uri req = Helper.BuildURI(API_URI, dest, Location.Accuracy, null, null, null, null, UserID, Location.Latitude, Location.Longitude, yak.ID, null, null, null, false);
                 Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
 
                 if (resp.Result == Result.SUCCESS)
@@ -964,7 +947,7 @@ namespace YikYak
 
                 String dest = isUpvote ? "likeComment" : "downvoteComment";
                 String messageID = isUpvote ? null : comment.Yak.ID;
-                Uri req = Helper.BuildURI(API_URI, dest, Location.Accuracy, null, null, null, null, UserID, Location.Latitude, Location.Longitude, messageID, comment.ID, null, null);
+                Uri req = Helper.BuildURI(API_URI, dest, Location.Accuracy, null, null, null, null, UserID, Location.Latitude, Location.Longitude, messageID, comment.ID, null, null, false);
                 Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
 
                 if (resp.Result != Result.SUCCESS)
@@ -984,7 +967,7 @@ namespace YikYak
         async public Task<Response<bool>> ReportYak(Yak yak, String reason)
         {
             Uri req = Helper.BuildURI(API_URI, "reportMessage", Location.Accuracy, null, null, Location.Latitude,
-                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, yak.ID, null, null, reason);
+                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, yak.ID, null, null, reason, false);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
 
             if (resp.Result == Result.SUCCESS)
@@ -997,7 +980,7 @@ namespace YikYak
         async public Task<Response<bool>> ReportComment(Comment c, String reason)
         {
             Uri req = Helper.BuildURI(API_URI, "reportComment", Location.Accuracy, null, null, Location.Latitude, 
-                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, c.Yak.ID, c.ID, null, reason);
+                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, c.Yak.ID, c.ID, null, reason, false);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
 
             if (resp.Result == Result.SUCCESS)
@@ -1009,7 +992,7 @@ namespace YikYak
         async public Task<Response<bool>> DeleteYak(Yak yak)
         {
             Uri req = Helper.BuildURI(API_URI, "deleteMessage2", Location.Accuracy, null, null, Location.Latitude,
-                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, yak.ID, null, null, null);
+                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, yak.ID, null, null, null, false);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
 
             if (resp.Result == Result.SUCCESS)
@@ -1022,7 +1005,7 @@ namespace YikYak
         async public Task<Response<bool>> DeleteComment(Comment c)
         {
             Uri req = Helper.BuildURI(API_URI, "deleteComment", Location.Accuracy, null, null, Location.Latitude,
-                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, c.Yak.ID, c.ID, null, null);
+                                      Location.Longitude, UserID, Location.Latitude, Location.Longitude, c.Yak.ID, c.ID, null, null, false);
             Response<String> resp = await Helper.Get(HTTP_CLIENT, req, CancellationToken.None);
 
             if (resp.Result == Result.SUCCESS)
@@ -1033,28 +1016,48 @@ namespace YikYak
         }
 
 
-
-        public bool HasDangerousWording(String message)
+        /// <summary>
+        /// Checks if a string contains what might be considered Threatening/Dangerous wording
+        /// </summary>
+        /// <param name="message">The string to check</param>
+        /// <returns>
+        /// If the return is null, it contains no threatening wording.  Otherwise, this function
+        /// returns a Tuple<String,bool> whereas the String is the message with which to prompt the user
+        /// and the bool indicates whether or not consent can be given to bypass this warning.
+        /// </returns>
+        public Tuple<String, bool> HasDangerousWording(String message)
         {
-            if (DANGER_WORDS == null || DANGER_WORDS.Length == 0) return false;
+            if (THREAT_CHECKS == null || THREAT_CHECKS.Count == 0) return null;
 
-            foreach (String regex in DANGER_WORDS)
+            foreach (ThreatCheck tc in THREAT_CHECKS)
             {
-                try
+                foreach (String exp in tc.Expressions)
                 {
-                    if (Regex.IsMatch(message, regex, RegexOptions.None))
-                        return true;
-                }
-                catch
-                {
-                    // Probably a unicode character ... so deal with it
-                    String unicodeSymbol = char.ConvertFromUtf32(int.Parse(regex.Substring(2), System.Globalization.NumberStyles.HexNumber)).ToString();
-                    if (message.Contains(unicodeSymbol))
-                        return true;
+                    try
+                    {
+                        if (Regex.IsMatch(message, exp, RegexOptions.None))
+                            return new Tuple<String, bool>(tc.Message, tc.AllowContinue);
+                    }
+                    catch
+                    {
+                        // Possibly a unicode character
+                        try
+                        {
+                            String unicodeSymbol = char.ConvertFromUtf32(int.Parse(exp.Substring(2), System.Globalization.NumberStyles.HexNumber)).ToString();
+                            if (message.Contains(unicodeSymbol))
+                                return new Tuple<String, bool>(tc.Message, tc.AllowContinue);
+                        }
+                        catch
+                        {
+                            // Just do a simple IndexOf check
+                            if (exp != null && message.IndexOf(exp) != -1)
+                                return new Tuple<String, bool>(tc.Message, tc.AllowContinue);
+                        }
+                    }
                 }
             }
 
-            return false;
+            return null;
         }
 
         async public Task<Response<bool>> PostYak(String message, String handle, bool bypassedThreatPopup)
@@ -1063,13 +1066,13 @@ namespace YikYak
             {
                 if (!String.IsNullOrWhiteSpace(message) && message.Length <= 200 && (String.IsNullOrWhiteSpace(handle) || handle.Length <= 15))
                 {
-                    Uri req = Helper.BuildURI(API_URI, "sendMessage", null, null, null, null, null, UserID, null, null, null, null, null, null);
+                    Uri req = Helper.BuildURI(API_URI, "sendMessage", null, null, null, null, null, UserID, null, null, null, null, null, null, false);
 
                     int idxSaltStart = req.Query.LastIndexOf("salt=") + 5;
                     int saltLength = req.Query.IndexOf('&', idxSaltStart) - idxSaltStart;
 
-                    String[] fields = { "bypassedThreatPopup", "hash", (!String.IsNullOrWhiteSpace(handle) ? "hndl" : null), "lat", "long", "message", "salt", "userID", "version" };
-                    String[] values = { (bypassedThreatPopup ? "1" : "0"), req.Query.Substring(req.Query.LastIndexOf('=')+1), handle, Location.Latitude.ToString("F7"), Location.Longitude.ToString("F7"), message, req.Query.Substring(idxSaltStart, saltLength), UserID, Config.API_VERSION };
+                    String[] fields = { "bc", "bypassedThreatPopup", "hash", (!String.IsNullOrWhiteSpace(handle) ? "hndl" : null), "lat", "long", "message", "salt", "userID", "version" };
+                    String[] values = { "0", (bypassedThreatPopup ? "1" : "0"), req.Query.Substring(req.Query.LastIndexOf('=')+1), handle, Location.Latitude.ToString("F7"), Location.Longitude.ToString("F7"), message, req.Query.Substring(idxSaltStart, saltLength), UserID, Config.API_VERSION };
                     HttpStringContent content = Helper.BuildPOSTContent(fields, values);
 
                     Response<String> resp = await Helper.Post(HTTP_CLIENT, req, content, CancellationToken.None);
@@ -1095,13 +1098,13 @@ namespace YikYak
             {
                 if (!String.IsNullOrWhiteSpace(comment) && comment.Length <= 200)
                 {
-                    Uri req = Helper.BuildURI(API_URI, "postComment", Location.Accuracy, null, null, null, null, UserID, Location.Latitude, Location.Longitude, null, null, null, null);
+                    Uri req = Helper.BuildURI(API_URI, "postComment", Location.Accuracy, null, null, null, null, UserID, Location.Latitude, Location.Longitude, null, null, null, null, false);
 
                     int idxSaltStart = req.Query.LastIndexOf("salt=") + 5;
                     int saltLength = req.Query.IndexOf('&', idxSaltStart) - idxSaltStart;
 
-                    String[] fields = { "accuracy", "bypassedThreatPopup", "comment", "hash",  "lat", "long", "messageID", "salt", "userID", "userLat", "userLong", "version" };
-                    String[] values = { Location.Accuracy.ToString("F1"), (bypassedThreatPopup ? "1" : "0"), comment, req.Query.Substring(req.Query.LastIndexOf('=') + 1), Location.Latitude.ToString("F7"), Location.Longitude.ToString("F7"), yak.ID, req.Query.Substring(idxSaltStart, saltLength), UserID, Location.Latitude.ToString("F7"), Location.Longitude.ToString("F7"), Config.API_VERSION };
+                    String[] fields = { "accuracy", "bc", "bypassedThreatPopup", "comment", "hash",  "lat", "long", "messageID", "salt", "userID", "userLat", "userLong", "version" };
+                    String[] values = { Location.Accuracy.ToString("F1"), "0", (bypassedThreatPopup ? "1" : "0"), comment, req.Query.Substring(req.Query.LastIndexOf('=') + 1), Location.Latitude.ToString("F7"), Location.Longitude.ToString("F7"), yak.ID, req.Query.Substring(idxSaltStart, saltLength), UserID, Location.Latitude.ToString("F7"), Location.Longitude.ToString("F7"), Config.API_VERSION };
                     HttpStringContent content = Helper.BuildPOSTContent(fields, values);
 
                     Response<String> resp = await Helper.Post(HTTP_CLIENT, req, content, CancellationToken.None);
@@ -1126,18 +1129,18 @@ namespace YikYak
             {
                 if (!String.IsNullOrWhiteSpace(message) && message.Length <= 200 && (String.IsNullOrWhiteSpace(handle) || handle.Length <= 15))
                 {
-                    Uri req = Helper.BuildURI(API_URI, "submitPeekMessage", null, null, null, null, null, UserID, null, null, null, null, null, null);
+                    Uri req = Helper.BuildURI(API_URI, "submitPeekMessage", null, null, null, null, null, UserID, null, null, null, null, null, null, null);
 
                     int idxSaltStart = req.Query.LastIndexOf("salt=") + 5;
                     int saltLength = req.Query.IndexOf('&', idxSaltStart) - idxSaltStart;
 
-                    String[] fields = { "bypassedThreatPopup", "hash", (!String.IsNullOrWhiteSpace(handle) ? "hndl" : null), "message", "peekID", "salt", "userID", "version" };
-                    String[] values = { (bypassedThreatPopup ? "1" : "0"), req.Query.Substring(req.Query.LastIndexOf('=') + 1), handle, message, peek.ID.ToString(), req.Query.Substring(idxSaltStart, saltLength), UserID, Config.API_VERSION };
+                    String[] fields = { "bypassedThreatPopup", "hash", (!String.IsNullOrWhiteSpace(handle) ? "hndl" : null), "lat", "long", "message", "peekID", "salt", "userID", "version" };
+                    String[] values = { (bypassedThreatPopup ? "1" : "0"), req.Query.Substring(req.Query.LastIndexOf('=') + 1), handle, Location.Latitude.ToString("F7"), Location.Longitude.ToString("F7"), message, peek.ID.ToString(), req.Query.Substring(idxSaltStart, saltLength), UserID, Config.API_VERSION };
                     HttpStringContent content = Helper.BuildPOSTContent(fields, values);
 
                     Response<String> resp = await Helper.Post(HTTP_CLIENT, req, content, CancellationToken.None);
 
-                    if (resp.Result == Result.SUCCESS)
+                    if (resp.Result == Result.SUCCESS && resp.Return.Equals("1"))
                         return new Response<bool>() { Result = Result.SUCCESS, Return = true };
                     else
                         return new Response<bool>() { Result = resp.Result, Return = false };

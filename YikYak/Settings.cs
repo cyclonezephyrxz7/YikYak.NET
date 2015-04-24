@@ -10,7 +10,7 @@ namespace YikYak
 {
     public class Settings
     {
-        static class Keys
+        internal static class Keys
         {
             internal const String SavedLocation_Latitude = "SettingsStashedLatitude";
             internal const String SavedLocation_Longitude = "SettingsStashedLongitude";
@@ -23,8 +23,8 @@ namespace YikYak
             internal const String UserID_GenerationMethod = "YikYakUserIDGenMethod";
 
             internal const String API_BaseUrl = "YikYakAPIBaseURL";
-            internal const String DangerWords_Message = "YikYakDangerWordsMessage";
-            internal const String DangerWords_Array = "YikYakDangerWords";
+            internal const String ThreatChecksList = "YikYakThreatChecksList";
+            internal const String ThreatChecksBase = "YikYakThreatCheckNumber";
 
             internal const String Parse_Success = "ParseRegistrationSuccess";
             internal const String Parse_IID = "ParseInstallationID";
@@ -94,16 +94,10 @@ namespace YikYak
             internal set { PutLocalSetting(Keys.API_BaseUrl, value); }
         }
 
-        public static String DangerWords_Message
+        public static String[] ThreatChecksList
         {
-            get { return (String)TryGetLocalSetting(Keys.DangerWords_Message, "Pump the brakes, this yak may contain threatening language. Now it's probably nothing and you're probably an awesome person but just know that Yik Yak and law enforcement take threats seriously. So you tell us, is this yak cool to post?"); }
-            internal set { PutLocalSetting(Keys.DangerWords_Message, value); }
-        }
-
-        public static String[] DangerWords_Array
-        {
-            get { return (String[])TryGetLocalSetting(Keys.DangerWords_Array, new String[] { "\\U0001F52A", "\\U0001F4A3", "\\U0001F52B", "Bullet\\b", "Bullets\\b", "Kill\\b", "Killing\\b", "\\bkill\\b", "\\bkills\\b", "blow up\\b", "bomb\\b", "bombed\\b", "bomber\\b", "bombing\\b", "bombing\\b", "bombs\\b", "bombs\\b", "columbine\\b", "explosion\\b", "explosive\\b", "explosives\\b", "gun\\b", "gunman\\b", "guns\\b", "handgun\\b", "handguns\\b", "killer\\b", "killing\\b", "knife\\b", "macheted\\b", "rape\\b", "raped\\b", "sandy hook\\b", "shoot\\b", "shooter\\b", "shooting\\b", "shooting\\b" }); }
-            internal set { PutLocalSetting(Keys.DangerWords_Array, value); }
+            get { return (String[])TryGetLocalSetting(Keys.ThreatChecksList); }
+            internal set { PutLocalSetting(Keys.ThreatChecksList, value); }
         }
 
         public static bool Parse_Success
@@ -136,7 +130,7 @@ namespace YikYak
             internal set { PutLocalSetting(Keys.SuppressYakAds, value); }
         }
 
-        private static Object TryGetLocalSetting(String key, Object def = null)
+        internal static Object TryGetLocalSetting(String key, Object def = null)
         {
             if (ApplicationData.Current.LocalSettings.Values.ContainsKey(key))
                 return ApplicationData.Current.LocalSettings.Values[key];
@@ -144,7 +138,7 @@ namespace YikYak
             return def;
         }
 
-        private static void PutLocalSetting(String key, Object val)
+        internal static void PutLocalSetting(String key, Object val)
         {
             if (ApplicationData.Current.LocalSettings.Values.ContainsKey(key))
                 ApplicationData.Current.LocalSettings.Values[key] = val;

@@ -144,7 +144,7 @@ namespace YikYak
         /// <returns></returns>
         internal static Uri BuildURI(Uri baseURI, String dest, double? accuracy, String deviceID, String token, 
                                     double? latitude, double? longitude, String userID, double? userLatitude,
-                                    double? userLongitude, String messageID, String commentID, int? peekID, String reason)
+                                    double? userLongitude, String messageID, String commentID, int? peekID, String reason, bool? isBasecamp)
         {
             UriBuilder builder = new UriBuilder(baseURI);
 
@@ -155,6 +155,7 @@ namespace YikYak
             StringBuilder query = new StringBuilder("?");
 
             if (accuracy != null) query.Append("accuracy=").Append(accuracy.Value.ToString("F1")).Append("&");
+            if (isBasecamp != null) query.Append("bc=").Append((isBasecamp.Value) ? "1" : "0").Append("&");
             if (deviceID != null) query.Append("deviceID=").Append(deviceID).Append("&");
             if (commentID != null) query.Append("commentID=").Append(WebUtility.UrlEncode(commentID)).Append("&");
             if (latitude != null) query.Append("lat=").Append(latitude.Value.ToString("F7")).Append("&");

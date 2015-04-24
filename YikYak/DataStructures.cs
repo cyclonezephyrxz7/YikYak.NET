@@ -576,5 +576,125 @@ namespace YikYak
         }
     }
 
+    public class ThreatCheck
+    {
+        public String Message;
+        public bool AllowContinue;
+        public String[] Expressions;
+
+        public ThreatCheck() { }
+
+        /// <summary>
+        /// Constructs a ThreatCheck based on a JsonObject
+        /// </summary>
+        /// <param name="jObj"></param>
+        public ThreatCheck(JsonObject jObj)
+        {
+            if (jObj != null && jObj.ContainsKey("message") && jObj.ContainsKey("allowContinue") && jObj.ContainsKey("expressions"))
+            {
+                try
+                {
+                    this.Message = jObj.GetNamedString("message");
+                    this.AllowContinue = jObj.GetNamedBoolean("allowContinue");
+
+                    JsonArray expressions = jObj.GetNamedArray("expressions");
+                    this.Expressions = new String[expressions.Count];
+                    for (uint i = 0; i < expressions.Count; i++)
+                        this.Expressions[i] = expressions.GetStringAt(i);
+                }
+                catch
+                {
+                    this.Message = null;
+                    this.AllowContinue = false;
+                    this.Expressions = null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Constructs a ThreatCheck based on a serialized string
+        /// </summary>
+        /// <param name="serialized"></param>
+        public ThreatCheck(String serialized)
+        {
+            try
+            {
+                JsonObject jObj = null;
+                if (JsonObject.TryParse(serialized, out jObj))
+                {
+                    this.Message = jObj.GetNamedString("Message");
+                    this.AllowContinue = jObj.GetNamedBoolean("AllowContinue");
+
+                    JsonArray jArr = jObj.GetNamedArray("Expressions");
+                    this.Expressions = new String[jArr.Count];
+                    for (uint i = 0; i < jArr.Count; i++)
+                    {
+                        this.Expressions[i] = jArr.GetStringAt(i);
+                    }
+                }
+            }
+            catch
+            {
+                this.Message = null;
+                this.AllowContinue = false;
+                this.Expressions = null;
+            }
+        }
+
+        /// <summary>
+        /// Serializes the ThreatCheck for transmission/storage
+        /// </summary>
+        /// <returns></returns>
+        public String Serialize()
+        {
+            JsonObject jObj = new JsonObject();
+            jObj.Add("Message", JsonValue.CreateStringValue(this.Message));
+            jObj.Add("AllowContinue", JsonValue.CreateBooleanValue(this.AllowContinue));
+
+            JsonArray jArr = new JsonArray();
+            foreach (String exp in this.Expressions)
+                jArr.Add(JsonValue.CreateStringValue(exp));
+
+            jObj.Add("Expressions", jArr);
+            return jObj.Stringify();
+        }
+
+        /// <summary>
+        /// Gets all available ThreatChecks from Settings and deserializes them
+        /// </summary>
+        /// <param name="keys"></param>
+        /// <returns></returns>
+        public static List<ThreatCheck> DeserializeFromSettings()
+        {
+            String[] keys = Settings.ThreatChecksList;
+
+            List<ThreatCheck> threatChecks = new List<ThreatCheck>();
+            foreach (String key in keys)
+            {
+                String raw = (String)Settings.TryGetLocalSetting(key);
+                if (raw != null)
+                {
+                    ThreatCheck tc = new ThreatCheck(raw);
+                    if (tc.Message != null && tc.Expressions != null)
+                        threatChecks.Add(tc);
+                }
+            }
+
+            return threatChecks;
+        }
+
+        public static void SerializeToSettings(List<ThreatCheck> threatChecks)
+        {
+            String[] saved = new String[threatChecks.Count];
+            for (int i = 0; i < threatChecks.Count; i++)
+            {
+                Settings.PutLocalSetting(Settings.Keys.ThreatChecksBase + i, threatChecks[i].Serialize());
+                saved[i] = Settings.Keys.ThreatChecksBase + i;
+            }
+
+            Settings.ThreatChecksList = saved;
+        }
+    }
+
     #endregion
 }
