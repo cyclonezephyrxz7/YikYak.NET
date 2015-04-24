@@ -5,7 +5,7 @@ This is an **unofficial** Open Source implementation of the YikYak API made prim
 
 It is made with .NET 4.5 and Windows (Phone) 8.1 in mind, though one could fairly easily rework it to fit your own needs.
 
-*Current Official YikYak API Version: 2.5.1*
+*Current Official YikYak API Version: 2.6.1*
 
 *This library is licensed with GPL2.0 with an additional constraint (listed at the bottom of this README).  Please remember to include the same license and attribution to my original source in your own projects.*
 
